@@ -4,12 +4,17 @@ import (
 	"log"
 	"net/http"
 	"github.com/go-express/router"
+	"github.com/go-express/env"
+	"github.com/go-express/handler"
+	
 )
 
+
 func main() {
-	router := &router.Router{}
-	router.Get("/hello", func (w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("<h1>Hello world</h1>"))
-	})
-	log.Fatal(http.ListenAndServe(":8080", router))
+	rtr := &router.Router{}
+	env := &env.Env{}
+	rtr.Get("/hello", handler.NewHandler(env, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("<h1>Hello World</h1>"))
+	}))
+	log.Fatal(http.ListenAndServe(":8080", rtr))
 }

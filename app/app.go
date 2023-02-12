@@ -13,8 +13,9 @@ import (
 func main() {
 	rtr := &router.Router{}
 	env := &env.Env{}
-	rtr.Get("/hello", handler.NewHandler(env, func(w http.ResponseWriter, r *http.Request) {
+	rtr.Get("/hello", handler.NewHandler(env, func(w http.ResponseWriter, r *http.Request) error {
 		w.Write([]byte("<h1>Hello World</h1>"))
+		return nil
 	}))
 	log.Fatal(http.ListenAndServe(":8080", rtr))
 }

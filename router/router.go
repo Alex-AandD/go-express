@@ -4,10 +4,8 @@ import (
 	"net/http"
 	"regexp"
 	"github.com/go-express/handler"
+	"log"
 )
-
-//type FuncHandler func(env *env.Env, w *http.ResponseWriter, r http.Request) error
-
 
 type RouteEntry struct {
 	Path string
@@ -15,7 +13,6 @@ type RouteEntry struct {
 	Params map[string]any
 	Handler handler.Handler
 }
-
 
 type Router struct {
 	BasePath string
@@ -60,10 +57,26 @@ func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	if entry := rtr.Match(path); entry != nil {
 		if r.Header.Get("method") != entry.Method {
+
 		}
-		entry.Handler.H(w, r)
+		err := entry.Handler.H(w, r)
+		if err != nil {
+			handleError(err, w)
+		}
 	} else {
 		http.NotFound(w, r)
+	}
+}
+
+func handleError(err error, w http.ResponseWriter) {
+	switch e := err.(type) {
+		case handler.Error:
+			log.Printf("HTTP %d - %s", e.Status(), e)
+			http.Error(w, e.Error(), e.Status())
+		default:
+			http.Error(w, 
+					http.StatusText(http.StatusInternalServerError),
+					http.StatusInternalServerError)
 	}
 }
 

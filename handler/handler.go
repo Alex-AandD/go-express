@@ -4,12 +4,32 @@ import (
 	"net/http"
 )
 
-type Handler struct {
-	Env 	*env.Env
-	H http.HandlerFunc
+type FuncHandler func (w http.ResponseWriter, r *http.Request) error
+
+type Error interface {
+	error
+	Status() int
 }
 
-func NewHandler(env *env.Env, h http.HandlerFunc) Handler {
+type StatusError struct {
+	Code 	int
+	Err  	error
+}
+
+func (se *StatusError) Error() string {
+	return se.Err.Error()
+}
+
+func (se *StatusError) Status() int {
+	return se.Code
+}
+
+type Handler struct {
+	Env 	*env.Env
+	H 		FuncHandler
+}
+
+func NewHandler(env *env.Env, h FuncHandler) Handler {
 	handler := Handler{Env: env, H: h}
 	return handler
 }

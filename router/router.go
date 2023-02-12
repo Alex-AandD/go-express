@@ -1,15 +1,21 @@
 package router
+
 import (
 	"net/http"
 	"regexp"
+	"github.com/go-express/handler"
 )
+
+//type FuncHandler func(env *env.Env, w *http.ResponseWriter, r http.Request) error
+
 
 type RouteEntry struct {
 	Path string
 	Method string
 	Params map[string]any
-	Handler http.HandlerFunc
+	Handler handler.Handler
 }
+
 
 type Router struct {
 	BasePath string
@@ -24,26 +30,26 @@ func expandPath(path string) string {
 	return expandedPath
 }
 
-func (rtr *Router) Get(path string, handler http.HandlerFunc) {
+func (rtr *Router) Get(path string, handler handler.Handler) {
 	// register the route inside of the entries
 	expPath := expandPath(path)
 	entry := RouteEntry{Path: expPath, Method: "GET", Handler: handler }
 	rtr.Entries = append(rtr.Entries, entry)
 }
 
-func (rtr *Router) Post(path string, handler http.HandlerFunc) {
+func (rtr *Router) Post(path string, handler handler.Handler) {
 	expPath := expandPath(path)
 	entry := RouteEntry{Path: expPath, Method: "POST", Handler: handler }
 	rtr.Entries = append(rtr.Entries, entry)
 }
 
-func (rtr *Router) Put(path string, handler http.HandlerFunc) {
+func (rtr *Router) Put(path string, handler handler.Handler) {
 	expPath := expandPath(path)
 	entry := RouteEntry{Path: expPath, Method: "PUT", Handler: handler }
 	rtr.Entries = append(rtr.Entries, entry)
 }
 
-func (rtr *Router) Delete(path string, handler http.HandlerFunc) {
+func (rtr *Router) Delete(path string, handler handler.Handler) {
 	expPath := expandPath(path)
 	entry := RouteEntry{Path: expPath, Method: "DELETE", Handler: handler }
 	rtr.Entries = append(rtr.Entries, entry)
@@ -55,7 +61,7 @@ func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if entry := rtr.Match(path); entry != nil {
 		if r.Header.Get("method") != entry.Method {
 		}
-		entry.Handler(w, r)
+		entry.Handler.H(w, r)
 	} else {
 		http.NotFound(w, r)
 	}

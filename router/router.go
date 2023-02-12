@@ -16,6 +16,14 @@ type Router struct {
 	Entries []RouteEntry
 }
 
+func expandPath(path string) string {
+	// first extract the name of the parameters
+	re := regexp.MustCompile(":([a-zA-Z0-9]+)")
+	expandedPath := re.ReplaceAllString(path, "(?P<$1>[a-zA-Z0-9]+)")
+	expandedPath = "^" + expandedPath + "$"
+	return expandedPath
+}
+
 func (rtr *Router) Get(path string, handler http.HandlerFunc) {
 	// register the route inside of the entries
 	expPath := expandPath(path)
@@ -27,15 +35,6 @@ func (rtr *Router) Post(path string, handler http.HandlerFunc) {
 	expPath := expandPath(path)
 	entry := RouteEntry{Path: expPath, Method: "POST", Handler: handler }
 	rtr.Entries = append(rtr.Entries, entry)
-}
-
-func expandPath(path string) string {
-	// first extract the name of the parameters
-	re := regexp.MustCompile(":([a-zA-Z0-9]+)")
-	expandedPath := re.ReplaceAllString(path, "(?P<$1>[a-zA-Z0-9]+)")
-	expandedPath = "^" + expandedPath + "$"
-	return expandedPath
-
 }
 
 func (rtr *Router) Put(path string, handler http.HandlerFunc) {
@@ -56,7 +55,6 @@ func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if entry := rtr.Match(path); entry != nil {
 		if r.Header.Get("method") != entry.Method {
 		}
-
 		entry.Handler(w, r)
 	} else {
 		http.NotFound(w, r)

@@ -1,100 +1,120 @@
 package router
 
+/*
+	path
+	stack 		middleware of functions
+	methods		map{ "GET": func, "Post": other function}
+
+*/
 import (
+	"fmt"
 	"net/http"
 	"regexp"
-	"github.com/go-express/handler"
-	"log"
+	"errors"
+	"github.com/go-express/request"
 )
 
-type RouteEntry struct {
-	Path string
-	Method string
-	Params map[string]any
-	Handler handler.Handler
+type NextFunction func() error
+type HandlerFunc func(w http.ResponseWriter, r *request.Request, next NextFunction) error
+
+type Route struct {
+	Path 		string
+	Stack	 	[]HandlerFunc
+	Method		string 	
 }
 
 type Router struct {
-	BasePath string
-	Entries []RouteEntry
+	BasePath	string
+	Rts 		[]*Route
 }
 
+func (rtr *Router) Get(path string, handlers ...HandlerFunc) error {
+	expPath := expandPath(path)
+
+	for _, e := range rtr.Rts {
+		if e.Path == expPath && e.Method == "GET" {
+			errors.New(fmt.Sprintf("Get method for route: %s already registered"))
+		}
+	}
+	// create route
+	route := &Route{
+		Path: expPath,
+		Stack: handlers,
+		Method: "GET",
+	}
+	// add route
+	rtr.Rts = append(rtr.Rts, route)
+	return nil
+}
+
+func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// create a new request object
+	R := &request.Request{R: r}
+	// get the path
+	path := r.URL.Path
+	
+	// check if a path exists
+	if route, params := rtr.findPath(path); route != nil {
+		// attach the params to the request
+		R.Params = params
+		// check if the method is correct
+		if route.Method != R.GetMethod() {
+			http.Error(w, "Method not allowed on this route", http.StatusBadRequest) 
+		}
+		if err := handleRoute(route, w, R); err == nil {
+			handleError(err)
+		}
+	}
+}
+
+func handleError(err error) {
+	fmt.Println(err)
+}
+
+func handleRoute(route *Route, w http.ResponseWriter, r *request.Request) error {
+	// next function
+	curr := 0
+	var next func() error
+	next = func () error {
+		if (curr == len(route.Stack) - 1) {
+			currHandler := route.Stack[curr]
+			return currHandler(w, r, func () error { return nil })
+		}
+
+		if (curr >= len(route.Stack)) {
+			return errors.New("no call")
+		}
+		currHandler := route.Stack[curr]
+		curr++
+		return currHandler(w, r, next)
+	}
+	next()
+	return nil
+}
+
+func (rtr *Router) findPath(path string) (*Route, map[string]string) {
+	for _, r:= range rtr.Rts {
+		re := regexp.MustCompile(r.Path)
+		matches := re.FindStringSubmatch(path) 
+		if matches != nil {
+			// good route found, proceed to get the parameters
+			params := make(map[string]string)
+			for i, name := range re.SubexpNames() {
+				if i > 0 {
+					params[name] = matches[i]
+				}
+			}
+			return r, params
+		}
+	}
+	return nil, nil 
+}
+
+/* SOME HELPER FUNCTIONS */
 func expandPath(path string) string {
 	// first extract the name of the parameters
 	re := regexp.MustCompile(":([a-zA-Z0-9]+)")
 	expandedPath := re.ReplaceAllString(path, "(?P<$1>[a-zA-Z0-9]+)")
 	expandedPath = "^" + expandedPath + "$"
 	return expandedPath
-}
-
-func (rtr *Router) Get(path string, handler handler.Handler) {
-	// register the route inside of the entries
-	expPath := expandPath(path)
-	entry := RouteEntry{Path: expPath, Method: "GET", Handler: handler }
-	rtr.Entries = append(rtr.Entries, entry)
-}
-
-func (rtr *Router) Post(path string, handler handler.Handler) {
-	expPath := expandPath(path)
-	entry := RouteEntry{Path: expPath, Method: "POST", Handler: handler }
-	rtr.Entries = append(rtr.Entries, entry)
-}
-
-func (rtr *Router) Put(path string, handler handler.Handler) {
-	expPath := expandPath(path)
-	entry := RouteEntry{Path: expPath, Method: "PUT", Handler: handler }
-	rtr.Entries = append(rtr.Entries, entry)
-}
-
-func (rtr *Router) Delete(path string, handler handler.Handler) {
-	expPath := expandPath(path)
-	entry := RouteEntry{Path: expPath, Method: "DELETE", Handler: handler }
-	rtr.Entries = append(rtr.Entries, entry)
-}
-
-func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// get the path of the request
-	path := r.URL.Path
-	if entry := rtr.Match(path); entry != nil {
-		if r.Header.Get("method") != entry.Method {
-
-		}
-		err := entry.Handler.H(w, r)
-		if err != nil {
-			handleError(err, w)
-		}
-	} else {
-		http.NotFound(w, r)
-	}
-}
-
-func handleError(err error, w http.ResponseWriter) {
-	switch e := err.(type) {
-		case handler.Error:
-			log.Printf("HTTP %d - %s", e.Status(), e)
-			http.Error(w, e.Error(), e.Status())
-		default:
-			http.Error(w, 
-					http.StatusText(http.StatusInternalServerError),
-					http.StatusInternalServerError)
-	}
-}
-
-func (rtr *Router) Match(path string) *RouteEntry {
-	for _, entry := range rtr.Entries {
-		re := regexp.MustCompile(entry.Path)
-		matches := re.FindStringSubmatch(path) 
-		if matches != nil {
-			// good route found, proceed to get the parameters
-			params := make(map[string]any)
-			for i, name := range re.SubexpNames() {
-				if i > 0 {
-					params[name] = matches[i]
-				}
-			}
-			entry.Params = params
-			return &entry
-		}
-	}
-	return nil 
 }

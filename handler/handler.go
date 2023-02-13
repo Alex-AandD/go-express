@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-type FuncHandler func (w http.ResponseWriter, r *http.Request) error
+type FuncHandler func (w http.ResponseWriter, r *http.Request, next FuncHandler) error
 
 type Error interface {
 	error
@@ -23,6 +23,7 @@ func (se *StatusError) Error() string {
 func (se *StatusError) Status() int {
 	return se.Code
 }
+
 
 type Handler struct {
 	Env 	*env.Env

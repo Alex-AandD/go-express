@@ -10,12 +10,12 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"errors"
 	"github.com/go-express/request"
+	"github.com/go-express/errors"
 )
 
-type NextFunction func() error
-type HandlerFunc func(w http.ResponseWriter, r *request.Request, next NextFunction) error
+type NextFunction func() errors.Error
+type HandlerFunc func(w http.ResponseWriter, r *request.Request, next NextFunction) errors.Error
 
 type Route struct {
 	Path 		string
@@ -28,12 +28,12 @@ type Router struct {
 	Rts 		[]*Route
 }
 
-func (rtr *Router) Get(path string, handlers ...HandlerFunc) error {
+func (rtr *Router) Get(path string, handlers ...HandlerFunc) errors.Error {
 	expPath := expandPath(path)
 
 	for _, e := range rtr.Rts {
 		if e.Path == expPath && e.Method == "GET" {
-			errors.New(fmt.Sprintf("Get method for route: %s already registered"))
+			return errors.NewRouterError(fmt.Sprintf("Router Error - route %s already covers GET method", path))
 		}
 	}
 	// create route
@@ -59,30 +59,36 @@ func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		R.Params = params
 		// check if the method is correct
 		if route.Method != R.GetMethod() {
-			http.Error(w, "Method not allowed on this route", http.StatusBadRequest) 
+			//http.Error(w, "Method not allowed on this route", http.StatusBadRequest) 
+			handleError(w, errors.NewStatusError("method not allowed on this route", http.StatusBadRequest))
 		}
-		if err := handleRoute(route, w, R); err == nil {
-			handleError(err)
+		if err := handleRoute(route, w, R); err != nil {
+			handleError(w, &err)
 		}
 	}
 }
 
-func handleError(err error) {
-	fmt.Println(err)
+func handleError(w http.ResponseWriter, err errors.Error) {
+	switch e := err.(type) {
+		case errors.StatusError:
+			http.Error(w, e.Error(), e.Status())
+		default:
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}
 }
 
-func handleRoute(route *Route, w http.ResponseWriter, r *request.Request) error {
+func handleRoute(route *Route, w http.ResponseWriter, r *request.Request) errors.Error {
 	// next function
 	curr := 0
-	var next func() error
-	next = func () error {
+	var next func() errors.Error
+	next = func () errors.Error {
 		if (curr == len(route.Stack) - 1) {
 			currHandler := route.Stack[curr]
-			return currHandler(w, r, func () error { return nil })
+			return currHandler(w, r, func () errors.Error { return nil })
 		}
 
 		if (curr >= len(route.Stack)) {
-			return errors.New("no call")
+			return errors.NewRouterError("router error")
 		}
 		currHandler := route.Stack[curr]
 		curr++

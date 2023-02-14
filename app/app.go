@@ -7,7 +7,9 @@ import (
 	_"github.com/go-express/env"
 	_"github.com/go-express/handler"
 	"github.com/go-express/request"
-	
+	"github.com/go-express/errors"
+
+
 )
 
 /*
@@ -26,12 +28,12 @@ func LoggingMdlw(next handler) handler {
 func main() {
 	rtr := &router.Router{}
 	rtr.Get("/hello", 
-	func (w http.ResponseWriter, r *request.Request, n router.NextFunction) error {
+	func (w http.ResponseWriter, r *request.Request, n router.NextFunction) errors.Error {
 		w.Write([]byte("<h1>Hello World</h1>"))
 		n()
 		return nil
 	},
-	func(w http.ResponseWriter, r *request.Request, n router.NextFunction) error {
+	func(w http.ResponseWriter, r *request.Request, n router.NextFunction) errors.Error {
 		w.Write([]byte("<h1>Hello World Number 2</h1>"))
 		n()
 		return nil
